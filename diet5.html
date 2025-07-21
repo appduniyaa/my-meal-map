@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Diet Companion</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      transition: background 0.3s, color 0.3s;
+    }
+    .tick-popup, .missed-popup {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      display: none;
+      z-index: 9999;
+      animation: fadeInOut 4s ease-in-out;
+    }
+    .tick-popup { background: #16a34a; }
+    .missed-popup { background: #dc2626; }
+
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translateY(-20px); }
+      10% { opacity: 1; transform: translateY(0); }
+      90% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-20px); }
+    }
+
+    .dark-theme {
+      background: linear-gradient(to bottom right, #0f172a, #1e293b);
+      color: #f3f4f6;
+    }
+    .light-theme {
+      background: linear-gradient(to bottom right, #e0f2fe, #fefce8);
+      color: #1f2937;
+    }
+    .card {
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .dark-theme .card {
+      background: rgba(30, 41, 59, 0.6);
+    }
+    .completed-check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      font-weight: bold;
+      color: #16a34a;
+      animation: fadeInOut 4s ease-in-out;
+    }
+    table {
+      width: 100%;
+      margin-top: 1rem;
+      border-collapse: collapse;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+      text-align: center;
+    }
+    th {
+      background-color: #facc15;
+    }
+  </style>
+</head>
+<body class="light-theme min-h-screen p-4">
+  <audio id="completeSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_b5a44e97ba.mp3?filename=correct-2-46134.mp3" preload="auto"></audio>
+
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-4xl font-extrabold text-center mb-8 tracking-wide text-yellow-600">✨ Smart Diet Companion ✨</h1>
+    <div class="flex justify-between items-center mb-6">
+      <button id="toggleTheme" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-5 rounded-full shadow-lg">Toggle Theme</button>
+    </div>
+
+    <div id="meal-container" class="space-y-8"></div>
+
+    <button class="mt-8 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-600 hover:to-pink-600 text-white font-bold py-3 px-6 rounded-full w-full shadow-xl transition-transform transform hover:scale-105" onclick="completeDay()">Done for the Day</button>
+
+    <div id="summary" class="mt-8 hidden p-6 bg-green-100 text-green-900 rounded-xl shadow-lg"></div>
+    <div id="calendar" class="mt-8"></div>
+  </div>
+
+  <div class="tick-popup" id="tickPopup">✅ ⭐ Meal Completed!</div>
+  <div class="missed-popup" id="missedPopup">❌ Meal Not Completed</div>
+
+  <script>
+    const meals = [
+      { time: "8 AM - Breakfast", items: ["Banana shake", "3 Boiled eggs", "2 Bread slices"], calories: 500, protein: 20, fat: 12, carbs: 55 },
+      { time: "11 AM - Mid Morning Snack", items: ["Peanut butter sandwich", "Handful almonds"], calories: 300, protein: 10, fat: 18, carbs: 20 },
+      { time: "2 PM - Lunch", items: ["2 Roti", "Paneer sabzi", "Rice", "Curd"], calories: 700, protein: 25, fat: 20, carbs: 60 },
+      { time: "5 PM - Evening Snack", items: ["Fruit salad", "Boiled chana"], calories: 250, protein: 12, fat: 6, carbs: 30 },
+      { time: "8 PM - Dinner", items: ["3 Roti", "Mixed sabzi", "Rice"], calories: 650, protein: 22, fat: 15, carbs: 58 },
+    ];
+
+    let dayProgress = [];
+    let calendarData = {};
+
+    const showPopup = (id) => {
+      const el = document.getElementById(id);
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 4000);
+    };
+
+    const renderMeals = () => {
+      const container = document.getElementById("meal-container");
+      container.innerHTML = "";
+      meals.forEach((meal, mealIndex) => {
+        const mealDiv = document.createElement("div");
+        mealDiv.classList.add("card", "p-6", "rounded-xl", "shadow-md", "transition-transform", "hover:scale-105");
+
+        const title = document.createElement("h2");
+        title.classList.add("text-2xl", "font-bold", "mb-4", "underline");
+        title.innerText = `${meal.time}`;
+        mealDiv.appendChild(title);
+
+        meal.items.forEach((item, itemIndex) => {
+          const label = document.createElement("label");
+          label.classList.add("flex", "items-center", "mb-2", "space-x-3");
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.dataset.meal = mealIndex;
+          checkbox.dataset.item = itemIndex;
+          checkbox.classList.add("form-checkbox", "text-green-500", "h-5", "w-5");
+          checkbox.addEventListener("change", () => {
+            trackMealProgress(mealIndex, mealDiv);
+          });
+
+          const span = document.createElement("span");
+          span.innerText = item;
+
+          label.appendChild(checkbox);
+          label.appendChild(span);
+          mealDiv.appendChild(label);
+        });
+
+        container.appendChild(mealDiv);
+      });
+    };
+
+    const trackMealProgress = (mealIndex, mealDiv) => {
+      const checkboxes = document.querySelectorAll(`input[data-meal='${mealIndex}']`);
+      const completed = Array.from(checkboxes).filter(cb => cb.checked);
+      const percent = (completed.length / checkboxes.length) * 100;
+      const existingCheck = mealDiv.querySelector(".completed-check");
+      if (existingCheck) existingCheck.remove();
+
+      if (percent === 100 && !dayProgress.includes(mealIndex)) {
+        showPopup('tickPopup');
+        document.getElementById("completeSound").play();
+        dayProgress.push(mealIndex);
+        const checkDiv = document.createElement("div");
+        checkDiv.className = "completed-check";
+        checkDiv.innerHTML = "<span>✅ ⭐ Completed!</span>";
+        mealDiv.appendChild(checkDiv);
+      } else if (percent < 100 && dayProgress.includes(mealIndex)) {
+        showPopup('missedPopup');
+      }
+    };
+
+    const completeDay = () => {
+      const today = new Date().toISOString().split('T')[0];
+      calendarData[today] = dayProgress.length === meals.length ? '✔️' : '❌';
+      renderCalendar();
+
+      const summary = document.getElementById("summary");
+      const total = meals.reduce((acc, meal) => {
+        acc.calories += meal.calories;
+        acc.protein += meal.protein;
+        acc.fat += meal.fat;
+        acc.carbs += meal.carbs;
+        return acc;
+      }, { calories: 0, protein: 0, fat: 0, carbs: 0 });
+
+      const consumed = dayProgress.reduce((acc, index) => {
+        const meal = meals[index];
+        acc.calories += meal.calories;
+        acc.protein += meal.protein;
+        acc.fat += meal.fat;
+        acc.carbs += meal.carbs;
+        return acc;
+      }, { calories: 0, protein: 0, fat: 0, carbs: 0 });
+
+      summary.classList.remove("hidden");
+      summary.innerHTML = `<h3 class='text-xl font-bold mb-4'>Daily Summary</h3>
+        <p><strong>Calories:</strong> ${consumed.calories} / ${total.calories} kcal</p>
+        <p><strong>Protein:</strong> ${consumed.protein} / ${total.protein} g</p>
+        <p><strong>Fat:</strong> ${consumed.fat} / ${total.fat} g</p>
+        <p><strong>Carbs:</strong> ${consumed.carbs} / ${total.carbs} g</p>
+        <p><strong>Meals Completed:</strong> ${dayProgress.length} of ${meals.length}</p>`;
+      alert("🎉 You've completed your day! See summary below.");
+    };
+
+    const renderCalendar = () => {
+      const calendar = document.getElementById("calendar");
+      calendar.innerHTML = "<h3 class='text-xl font-bold mb-2'>📅 Progress Tracker</h3>";
+      const table = document.createElement("table");
+      const header = document.createElement("tr");
+      header.innerHTML = "<th>Date</th><th>Status</th>";
+      table.appendChild(header);
+
+      for (const date in calendarData) {
+        const row = document.createElement("tr");
+        row.innerHTML = `<td>${date}</td><td>${calendarData[date]}</td>`;
+        table.appendChild(row);
+      }
+
+      calendar.appendChild(table);
+    };
+
+    const toggleTheme = () => {
+      document.body.classList.toggle('dark-theme');
+      document.body.classList.toggle('light-theme');
+    };
+
+    document.getElementById("toggleTheme").addEventListener("click", toggleTheme);
+    renderMeals();
+  </script>
+</body>
+</html>
